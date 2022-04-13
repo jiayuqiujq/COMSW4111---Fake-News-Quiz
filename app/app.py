@@ -1,7 +1,8 @@
+from asyncio.windows_events import NULL
 import os
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
-from flask import Flask, request, render_template, g, redirect, Response
+from flask import Flask, flash, request, render_template, g, redirect, Response, session
 
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 app = Flask(__name__, template_folder=tmpl_dir)
@@ -43,3 +44,69 @@ def teardown_request(exception):
   except Exception as e:
     pass
 
+
+# Login
+
+@app.route('/')
+def home():
+  if not session.get('logged_in'):
+    return render_template('login.html')
+  else:
+    cursor1 = g.conn.execute("""
+            SELECT
+                name
+            FROM
+                users
+            WHERE
+                uid = %(username)s
+        """, {
+          # Right now this is hardcoded to bob02 because I haven't been able to find a way to access the username from the existing login
+            'username': 'bob02'
+        })
+    result = cursor1.fetchone()
+    cursor1.close()
+
+    cursor2 = g.conn.execute("SELECT * FROM Topics")
+    topic_names = []
+    for name in cursor2:
+      topic_names.append(name['topic_name']) 
+    cursor2.close()
+
+    context = dict(name = str(result), topic = topic_names)
+    return render_template('homepage.html', **context)
+
+@app.route('/login', methods=['POST'])
+def do_admin_login():
+  POST_USERNAME = str(request.form['username'])
+  POST_PASSWORD = str(request.form['password'])
+  cursor = g.conn.execute("""
+            SELECT
+                password
+            FROM
+                users
+            WHERE
+                uid = %(username)s
+        """, {
+            'username': POST_USERNAME
+        })
+  result = cursor.fetchone()
+  cursor.close()
+  if result is None:
+    flash('User does not exist')
+    return home()
+  elif result == (POST_PASSWORD,) or result == (None,):
+    session['logged_in'] = True
+  elif result != POST_PASSWORD:
+    flash('wrong password!')
+  return home()
+
+@app.route("/logout")
+def logout():
+  session['logged_in'] = False
+  return home()
+
+
+
+if __name__ == "__main__":
+  app.secret_key = os.urandom(12)
+  app.run(debug=True,host='0.0.0.0', port=4000)
