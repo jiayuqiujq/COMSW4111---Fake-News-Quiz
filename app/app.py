@@ -1,12 +1,3 @@
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route("/")
-def hello_world():
-    return "<p>Hello, World!</p>"
-
-
 import os
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
@@ -51,3 +42,4 @@ def teardown_request(exception):
     g.conn.close()
   except Exception as e:
     pass
+
