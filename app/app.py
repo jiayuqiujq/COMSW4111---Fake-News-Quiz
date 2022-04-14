@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 import os
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
@@ -14,6 +15,8 @@ DB_SERVER = "w4111.cisxo09blonu.us-east-1.rds.amazonaws.com"
 
 DATABASEURI = "postgresql://"+DB_USER+":"+DB_PASSWORD+"@"+DB_SERVER+"/proj1part2"
 
+# Global Variables
+login_uid = 'alice01'
 
 engine = create_engine(DATABASEURI)
 
@@ -60,8 +63,7 @@ def home():
             WHERE
                 uid = %(username)s
         """, {
-          # Right now this is hardcoded to bob02 because I haven't been able to find a way to access the username from the existing login
-            'username': 'bob02'
+            'username': login_uid
         })
     result = cursor1.fetchone()
     user_name = result['name']
@@ -97,6 +99,8 @@ def do_admin_login():
     return home()
   elif result['password'] == POST_PASSWORD or result['password'] == None:
     session['logged_in'] = True
+    global login_uid
+    login_uid = POST_USERNAME
   elif result['password'] != POST_PASSWORD:
     flash('wrong password!')
   return home()
@@ -104,6 +108,8 @@ def do_admin_login():
 @app.route("/logout")
 def logout():
   session['logged_in'] = False
+  global login_uid
+  login_uid = NULL
   return home()
 
 
@@ -111,20 +117,42 @@ def logout():
 
 @app.route('/quiz', methods=['POST'])
 def new_attempt():
-    today = date.today()
-    d = today.strftime("%Y-/%m-/%d")
-    # cmd = 'INSERT INTO Attempt VALUES (:attempt_id), (:topic_name), (:uid), (:date)';
-    # g.conn.execute(text(cmd), topic_name = topic_name, date = d);
+  cursor1 = g.conn.execute("""
+          SELECT
+              MAX(attempt_id) AS last_attempt
+          FROM
+              Attempt
+          GROUP BY
+              uid = %(username)s
+      """, {
+          'username': login_uid
+      })
+  result = cursor1.fetchone()
+  attempt_id= result['last_attempt'] + 1
+  topic_name = request.form['name']
+  today = date.today()
+  d = today.strftime("%Y-%m-%d")
+  cmd = 'INSERT INTO Attempt VALUES (:attempt_id), (:topic_name), (:uid), (:date)';
+  g.conn.execute(text(cmd), attempt_id = attempt_id, topic_name = topic_name, uid = login_uid, date = d);
 
-    cursor = g.conn.execute("SELECT content FROM Claims WHERE topic_name = 'COVID-19'")
-    all_claims = []
-    for claim in cursor:
-      all_claims.append(claim['content']) 
-    cursor.close()
+  cursor2 = g.conn.execute("""
+          SELECT
+              content
+          FROM
+              Claims
+          WHERE
+              topic_name = %(topic_name)s
+      """, {
+          'topic_name': topic_name
+      })
+  all_claims = []
+  for claim in cursor2:
+    all_claims.append(claim['content']) 
+  cursor2.close()
 
-    context = dict(claim = all_claims)
+  context = dict(claim = all_claims)
 
-    return render_template('quiz.html', **context)
+  return render_template('quiz.html', **context)
 
 
 if __name__ == "__main__":

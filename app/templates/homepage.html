@@ -11,15 +11,13 @@
     <h2>Topics Available</h2>
     <div>
       {% for n in topic %}
-      <div>
-        <form method="POST" action="/quiz">
-        <input type="submit" value={{n}}>
-      </form>
-      </div>
+      <div>{{n}}</div>
       {% endfor %}
     </div>
 
-    
+    <form method="POST" action="/quiz">
+      <p>Name of topic selected: <input type="text" name="name"> <input type="submit" value="Start Attempt"></p>
+      </form>
 
 
 </body>
