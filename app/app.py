@@ -2,6 +2,7 @@ from asyncio.windows_events import NULL
 import os
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
+from datetime import date
 from flask import Flask, flash, request, render_template, g, redirect, Response, session
 
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
@@ -64,6 +65,7 @@ def home():
             'username': 'bob02'
         })
     result = cursor1.fetchone()
+    user_name = result['name']
     cursor1.close()
 
     cursor2 = g.conn.execute("SELECT * FROM Topics")
@@ -72,7 +74,7 @@ def home():
       topic_names.append(name['topic_name']) 
     cursor2.close()
 
-    context = dict(name = str(result), topic = topic_names)
+    context = dict(name = str(user_name), topic = topic_names)
     return render_template('homepage.html', **context)
 
 @app.route('/login', methods=['POST'])
@@ -94,9 +96,9 @@ def do_admin_login():
   if result is None:
     flash('User does not exist')
     return home()
-  elif result == (POST_PASSWORD,) or result == (None,):
+  elif result['password'] == POST_PASSWORD or result['password'] == None:
     session['logged_in'] = True
-  elif result != POST_PASSWORD:
+  elif result['password'] != POST_PASSWORD:
     flash('wrong password!')
   return home()
 
@@ -105,6 +107,15 @@ def logout():
   session['logged_in'] = False
   return home()
 
+
+# Starting an Attempt
+@app.route('/add', methods=['POST'])
+def new_attempt():
+    today = date.today()
+    d = today.strftime("%Y-/%m-/%d")
+    # cmd = 'INSERT INTO Attempt VALUES (:attempt_id), (:topic_name), (:uid), (:date)';
+    # g.conn.execute(text(cmd), topic_name = topic_name, date = d);
+    return render_template('quiz.html')
 
 
 if __name__ == "__main__":

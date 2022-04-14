@@ -8,12 +8,17 @@
 
     <div>{{name}}</div>
 
-  <h2>Choose Topic</h2>
-  <div>
-    {% for n in topic %}
-    <div>{{n}}</div>
-    {% endfor %}
-  </div>
+    <h2>Topics Available</h2>
+    <div>
+      {% for n in topic %}
+      <div>{{n}}</div>
+      {% endfor %}
+    </div>
+
+    <h3>New Attempt</h3>
+    <form method="POST" action="/add">
+    <p>Topic Choice: <input type="text" topic_name="topic_name"> <a href="/quiz"></a> <input type="submit" value="Start Quiz"></p>
+    </form>
 
 
 
