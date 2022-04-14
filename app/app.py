@@ -116,7 +116,16 @@ def new_attempt():
     d = today.strftime("%Y-/%m-/%d")
     # cmd = 'INSERT INTO Attempt VALUES (:attempt_id), (:topic_name), (:uid), (:date)';
     # g.conn.execute(text(cmd), topic_name = topic_name, date = d);
-    return render_template('quiz.html')
+
+    cursor = g.conn.execute("SELECT content FROM Claims WHERE topic_name = 'COVID-19'")
+    all_claims = []
+    for claim in cursor:
+      all_claims.append(claim['content']) 
+    cursor.close()
+
+    context = dict(claim = all_claims)
+
+    return render_template('quiz.html', **context)
 
 
 if __name__ == "__main__":
