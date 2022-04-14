@@ -109,7 +109,8 @@ def logout():
 
 
 # Starting an Attempt
-@app.route('/add', methods=['POST'])
+
+@app.route('/quiz', methods=['POST'])
 def new_attempt():
     today = date.today()
     d = today.strftime("%Y-/%m-/%d")
