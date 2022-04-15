@@ -14,12 +14,24 @@
 
     <h3>Attempt Summary</h3>
 
-    {% for table in tables %}
-        {{titles[loop.index]}}
+    {% for table in tables1 %}
+        {{titles1[loop.index]}}
         {{ table|safe }}
     {% endfor %}
 
-    <h4>Friends</h4>
+    <h3>Friends</h3>
+
+    {% for table in tables2 %}
+        {{titles2[loop.index]}}
+        {{ table|safe }}
+    {% endfor %}
+
+    <h3>Performance of People Near You</h3>
+
+    {% for table in tables3 %}
+        {{titles3[loop.index]}}
+        {{ table|safe }}
+    {% endfor %}
 
 
     <p><a href="/">Return Home</a></p>

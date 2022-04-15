@@ -3,7 +3,7 @@ import pandas as pd
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
 from datetime import date
-from flask import Flask, flash, request, render_template, g, redirect, Response, session
+from flask import Flask, flash, request, render_template, g, session
 
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 app = Flask(__name__, template_folder=tmpl_dir)
@@ -49,7 +49,6 @@ def teardown_request(exception):
   except Exception as e:
     pass
 
-
 # Login
 
 @app.route('/')
@@ -68,8 +67,12 @@ def home():
             'username': login_uid
         })
     result = cursor1.fetchone()
-    user_name = result['name']
     cursor1.close()
+
+    if result['name'] is None:
+      user_name = ' '
+    else:
+      user_name = result['name']
 
     cursor2 = g.conn.execute("SELECT * FROM Topics")
     topic_names = []
@@ -77,7 +80,7 @@ def home():
       topic_names.append(name['topic_name']) 
     cursor2.close()
 
-    context = dict(name = str(user_name), topic = topic_names)
+    context = dict(name = user_name, topic = topic_names)
     return render_template('homepage.html', **context)
 
 @app.route('/login', methods=['POST'])
@@ -108,9 +111,10 @@ def do_admin_login():
   return home()
 
 # Profile
+
 @app.route('/user_profile')
 def user_profile():
-  cursor = g.conn.execute("""
+  cursor1 = g.conn.execute("""
           SELECT
               Response.attempt_id, topic_name, SUM(score), time
           FROM
@@ -125,18 +129,71 @@ def user_profile():
             'username': login_uid
       })
   attempt_summary_list = []
-  for result in cursor:
+  for result in cursor1:
     attempt_summary_list.append(result)
-  cursor.close()
+  cursor1.close()
 
   attempt_summary = pd.DataFrame(attempt_summary_list, columns = ['Attempt No.', 'Topic', 'Attempt Score', 'Date Attempt Made']).set_index('Attempt No.')
 
-  context = dict(uid = login_uid)
-  return render_template("profile.html", tables=[attempt_summary.to_html(classes='data')], titles=attempt_summary.columns.values, **context)
+  cursor2 = g.conn.execute("""
+          SELECT
+              isFriend.uid2, SUM(score)/ COUNT(DISTINCT attempt_id)
+          FROM
+              isFriend, Response
+          WHERE
+              isFriend.uid1 = %(username)s AND Response.uid = isFriend.uid2
+          GROUP BY
+              isFriend.uid2
+        """, {
+            'username': login_uid
+      })
+  friend_scores_list = []
+  for result in cursor2:
+    friend_scores_list.append(result)
+  cursor2.close()
+
+  friend_scores = pd.DataFrame(friend_scores_list, columns = ['Friend', 'Average Attempt Score'])
+
+  cursor3 = g.conn.execute("""
+          SELECT
+              zipcode
+          FROM
+              Users
+          WHERE
+              uid = %(username)s
+      """, {        
+          'username': login_uid
+      })
+  login_zipcode = cursor3.fetchone()[0]
+  cursor3.close()
+
+  cursor4 = g.conn.execute("""
+          SELECT
+              Topics.topic_name, SUM(score)/ COUNT(DISTINCT attempt_id)
+          FROM
+              Users, Response, Claims, Topics
+          WHERE
+              Users.zipcode = %(zipcode)s AND Users.uid = Response.uid AND Response.claim_id = Claims.claim_id AND Claims.topic_name = Topics.topic_name
+          GROUP BY
+              Topics.topic_name
+        """,  {
+            'zipcode': login_zipcode
+      })
+
+  location_average_attempt_score_list = []
+  for result in cursor4:
+    location_average_attempt_score_list.append(result)
+  cursor4.close()
+
+  location_average_attempt_score = pd.DataFrame(location_average_attempt_score_list, columns = ['Topic', 'Average Attempt Score'])
+
+  context = dict(uid = login_uid, tables1=[attempt_summary.to_html(classes='data')], titles1=attempt_summary.columns.values, tables2=[friend_scores.to_html(classes='data')], titles2=friend_scores.columns.values,  tables3=[location_average_attempt_score.to_html(classes='data')], titles3=location_average_attempt_score.columns.values)
+  
+  return render_template("profile.html", **context)
 
 # Starting an Attempt
 
-@app.route('/new_attempt', methods=['POST'])
+@app.route('/new_attempt', methods=['GET','POST'])
 def new_attempt():
 
   topic_name = request.form['name']
@@ -174,7 +231,7 @@ def new_attempt():
             'username': login_uid
         })
     result1 = cursor1.fetchone()
-    if result1 is None:
+    if result1['last_attempt'] is None:
       global attempt_id
       attempt_id = 1
     else:
