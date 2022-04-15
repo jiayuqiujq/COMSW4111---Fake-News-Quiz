@@ -110,27 +110,8 @@ def do_admin_login():
 
 @app.route('/new_attempt', methods=['POST'])
 def new_attempt():
-  cursor1 = g.conn.execute("""
-          SELECT
-              MAX(attempt_id) AS last_attempt
-          FROM
-              Attempt
-          WHERE
-              uid = %(username)s
-      """, {
-          'username': login_uid
-      })
-  result1 = cursor1.fetchone()
-  if result1 is None:
-    global attempt_id
-    attempt_id = 0
-  else:
-    attempt_id = result1['last_attempt'] + 1
+
   topic_name = request.form['name']
-  today = date.today()
-  d = today.strftime("%Y-%m-%d")
-  cmd = 'INSERT INTO Attempt VALUES (:attempt_id, :topic_name, :uid, :date)';
-  g.conn.execute(text(cmd), attempt_id = attempt_id, topic_name = topic_name, uid = login_uid, date = d);
 
   cursor2 = g.conn.execute("""
           SELECT
@@ -143,12 +124,39 @@ def new_attempt():
           'topic_name': topic_name
       })
   result2 = cursor2.fetchone()
-  global claim_id
-  claim_id = result2['claim_id']
-  claim = result2['content']
-  cursor2.close()
-  context = dict(claim = claim)
-  return render_template('quiz.html', **context)
+  
+  if result2 is None:
+    flash('Topic not found, please try again')
+    return home()
+  else:
+    global claim_id
+    claim_id = result2['claim_id']
+    claim = result2['content']
+    cursor2.close()
+    context = dict(claim = claim)
+
+    cursor1 = g.conn.execute("""
+            SELECT
+                MAX(attempt_id) AS last_attempt
+            FROM
+                Attempt
+            WHERE
+                uid = %(username)s
+        """, {
+            'username': login_uid
+        })
+    result1 = cursor1.fetchone()
+    if result1 is None:
+      global attempt_id
+      attempt_id = 0
+    else:
+      attempt_id = result1['last_attempt'] + 1
+    today = date.today()
+    d = today.strftime("%Y-%m-%d")
+    cmd = 'INSERT INTO Attempt VALUES (:attempt_id, :topic_name, :uid, :date)';
+    g.conn.execute(text(cmd), attempt_id = attempt_id, topic_name = topic_name, uid = login_uid, date = d);
+
+    return render_template('quiz.html', **context)
 
 # Answering a quiz question
 
