@@ -7,11 +7,19 @@
     <h1>Quiz Page</h1>
 
     <h2>Claim</h2>
-    <div>
-        {% for n in claim %}
-        <div>{{n}}</div>
-        {% endfor %}
-      </div>
+    <div>{{claim}} </div>
+
+    <form method="POST" action="/quiz">
+        <p>Type 1 for True, 0 for Misleading and -1 for False: <input type="text" name="verdict"> <input type="submit" value="Submit"></p>
+        </form>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+           {% for message in messages %}
+              {{ message }}
+           {% endfor %}
+        {% endif %}
+     {% endwith %}
 
 </body>
 

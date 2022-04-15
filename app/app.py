@@ -17,6 +17,8 @@ DATABASEURI = "postgresql://"+DB_USER+":"+DB_PASSWORD+"@"+DB_SERVER+"/proj1part2
 
 # Global Variables
 login_uid = 'alice01'
+attempt_id = 0
+claim_id = 0
 
 engine = create_engine(DATABASEURI)
 
@@ -105,39 +107,32 @@ def do_admin_login():
     flash('wrong password!')
   return home()
 
-@app.route("/logout")
-def logout():
-  session['logged_in'] = False
-  global login_uid
-  login_uid = NULL
-  return home()
-
-
 # Starting an Attempt
 
-@app.route('/quiz', methods=['POST'])
+@app.route('/new_attempt', methods=['POST'])
 def new_attempt():
   cursor1 = g.conn.execute("""
           SELECT
               MAX(attempt_id) AS last_attempt
           FROM
               Attempt
-          GROUP BY
+          WHERE
               uid = %(username)s
       """, {
           'username': login_uid
       })
-  result = cursor1.fetchone()
-  attempt_id= result['last_attempt'] + 1
+  result1 = cursor1.fetchone()
+  global attempt_id
+  attempt_id = result1['last_attempt'] + 1
   topic_name = request.form['name']
   today = date.today()
   d = today.strftime("%Y-%m-%d")
-  cmd = 'INSERT INTO Attempt VALUES (:attempt_id), (:topic_name), (:uid), (:date)';
+  cmd = 'INSERT INTO Attempt VALUES (:attempt_id, :topic_name, :uid, :date)';
   g.conn.execute(text(cmd), attempt_id = attempt_id, topic_name = topic_name, uid = login_uid, date = d);
 
   cursor2 = g.conn.execute("""
           SELECT
-              content
+              claim_id, content
           FROM
               Claims
           WHERE
@@ -145,15 +140,53 @@ def new_attempt():
       """, {
           'topic_name': topic_name
       })
-  all_claims = []
-  for claim in cursor2:
-    all_claims.append(claim['content']) 
+  result2 = cursor2.fetchone()
+  global claim_id
+  claim_id = result2['claim_id']
+  claim = result2['content']
   cursor2.close()
-
-  context = dict(claim = all_claims)
-
+  context = dict(claim = claim)
   return render_template('quiz.html', **context)
 
+@app.route('/quiz', methods=['POST'])
+def quiz():
+  cursor = g.conn.execute("""
+          SELECT
+              verdict
+          FROM
+              Claims
+          WHERE
+              claim_id = %(claim_id)s
+      """, {
+          'claim_id': claim_id
+      })
+  result = cursor.fetchone()
+  verdict = int(request.form['verdict'])
+
+  if verdict == result['verdict']:
+    score = 1
+  else:
+    score = 0
+
+  flash('score')
+
+  cursor = g.conn.execute("""
+          SELECT
+              MAX(response_id) AS last_response
+          FROM
+              Response
+          WHERE
+              attempt_id = %(attempt_id)s AND claim_id = %(claim_id)s AND uid = %(username)s
+      """, {
+          'attempt_id': attempt_id, 'claim_id': claim_id, 'username': login_uid
+      })
+  result = cursor.fetchone()
+  response_id= result['last_response'] + 1
+
+  cmd = 'INSERT INTO Response VALUES (:response_id, :uid, :attempt_id, :claim_id, :verdict, :score)';
+  g.conn.execute(text(cmd), response_id = response_id, uid = login_uid, attempt_id = attempt_id, claim_id = claim_id, verdict = verdict, score = score);
+  return quiz()
+    
 
 if __name__ == "__main__":
   app.secret_key = os.urandom(12)
