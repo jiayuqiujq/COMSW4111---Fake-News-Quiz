@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
 from datetime import date
@@ -106,6 +107,33 @@ def do_admin_login():
     flash('wrong password!')
   return home()
 
+# Profile
+@app.route('/user_profile')
+def user_profile():
+  cursor = g.conn.execute("""
+          SELECT
+              Response.attempt_id, topic_name, SUM(score), time
+          FROM
+              Response, Attempt
+          WHERE
+              Response.uid = %(username)s AND Attempt.uid = Response.uid AND Attempt.attempt_id = Response.attempt_id
+          GROUP BY
+              Response.attempt_id, topic_name, time
+          ORDER BY
+              Response.attempt_id
+        """, {
+            'username': login_uid
+      })
+  attempt_summary_list = []
+  for result in cursor:
+    attempt_summary_list.append(result)
+  cursor.close()
+
+  attempt_summary = pd.DataFrame(attempt_summary_list, columns = ['Attempt No.', 'Topic', 'Attempt Score', 'Date Attempt Made']).set_index('Attempt No.')
+
+  context = dict(uid = login_uid)
+  return render_template("profile.html", tables=[attempt_summary.to_html(classes='data')], titles=attempt_summary.columns.values, **context)
+
 # Starting an Attempt
 
 @app.route('/new_attempt', methods=['POST'])
@@ -148,7 +176,7 @@ def new_attempt():
     result1 = cursor1.fetchone()
     if result1 is None:
       global attempt_id
-      attempt_id = 0
+      attempt_id = 1
     else:
       attempt_id = result1['last_attempt'] + 1
     today = date.today()

@@ -1,0 +1,30 @@
+<html>
+
+<link rel="stylesheet" href="/static/style.css" type="text/css">
+
+
+<body>
+    <h1>Profile Page</h1>
+
+    <h2>Username</h2>
+    <div>
+        <div>{{uid}}</div>
+        
+    </div>
+
+    <h3>Attempt Summary</h3>
+
+    {% for table in tables %}
+        {{titles[loop.index]}}
+        {{ table|safe }}
+    {% endfor %}
+
+    <h4>Friends</h4>
+
+
+    <p><a href="/">Return Home</a></p>
+
+
+
+</body>
+</html>
