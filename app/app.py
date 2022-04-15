@@ -1,4 +1,3 @@
-from asyncio.windows_events import NULL
 import os
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
@@ -122,8 +121,11 @@ def new_attempt():
           'username': login_uid
       })
   result1 = cursor1.fetchone()
-  global attempt_id
-  attempt_id = result1['last_attempt'] + 1
+  if result1 is None:
+    global attempt_id
+    attempt_id = 0
+  else:
+    attempt_id = result1['last_attempt'] + 1
   topic_name = request.form['name']
   today = date.today()
   d = today.strftime("%Y-%m-%d")
@@ -148,11 +150,13 @@ def new_attempt():
   context = dict(claim = claim)
   return render_template('quiz.html', **context)
 
+# Answering a quiz question
+
 @app.route('/quiz', methods=['POST'])
 def quiz():
-  cursor = g.conn.execute("""
+  cursor1 = g.conn.execute("""
           SELECT
-              verdict
+              verdict, explanation, source
           FROM
               Claims
           WHERE
@@ -160,17 +164,15 @@ def quiz():
       """, {
           'claim_id': claim_id
       })
-  result = cursor.fetchone()
+  result1 = cursor1.fetchone()
   verdict = int(request.form['verdict'])
 
-  if verdict == result['verdict']:
+  if verdict == result1['verdict']:
     score = 1
   else:
     score = 0
 
-  flash('score')
-
-  cursor = g.conn.execute("""
+  cursor2 = g.conn.execute("""
           SELECT
               MAX(response_id) AS last_response
           FROM
@@ -180,12 +182,17 @@ def quiz():
       """, {
           'attempt_id': attempt_id, 'claim_id': claim_id, 'username': login_uid
       })
-  result = cursor.fetchone()
-  response_id= result['last_response'] + 1
+  result2 = cursor2.fetchone()
+  if result2['last_response'] is None:
+    response_id = 1
+  else:
+    response_id = result2['last_response'] + 1
 
   cmd = 'INSERT INTO Response VALUES (:response_id, :uid, :attempt_id, :claim_id, :verdict, :score)';
   g.conn.execute(text(cmd), response_id = response_id, uid = login_uid, attempt_id = attempt_id, claim_id = claim_id, verdict = verdict, score = score);
-  return quiz()
+
+  context = dict(score = score, explanation = result1['explanation'], source = result1['source'])
+  return render_template('answer.html', **context)
     
 
 if __name__ == "__main__":
